@@ -9,8 +9,8 @@ from flask import jsonify
 from sentence_transformers import SentenceTransformer
 model = SentenceTransformer("all-MiniLM-L6-v2")
 load_dotenv()
-pinecone.init(api_key= os.getenv('api_key'), environment=os.getenv('type'))
-index = pinecone.Index('text-chunks')
+pinecone.init(api_key= os.getenv('API_KEY'), environment=os.getenv('TYPE'))
+index = pinecone.Index('pdf-pages')
 
 app = Flask(__name__)
 
@@ -49,22 +49,21 @@ def upload_file():
 def delete_file():
     filename = request.args.get('filename')
     query_response = index.delete(filter={'Book' : filename})
+    return query_response
     
-    
-    
-    
-
 @app.route('/search', methods=['GET'])
 def search():
     question = request.args.get('question')
     query_em = model.encode(question).tolist()
-    results = index.query(query_em, top_k=1 , include_metadata=True)
+    results = index.query(query_em, top_k=5 , include_metadata=True)
     print(results)
-    result = {}
-    result['id'] = results['matches'][0]['id']
-    result['context'] = results['matches'][0]['metadata']['context']
-    json_string = json.dumps(result)
-    return jsonify(json_string)
+    response = []
+    for match in results['matches']:
+        result = {}
+        result['id'] = match['id']
+        result['context'] = match['metadata']['context']
+        response.append(result)
+    return jsonify(response)
     
 @app.route('/search_and_ask' , methods= ['GET'])
 def searchandask():
@@ -72,6 +71,8 @@ def searchandask():
     query_em = model.encode(question).tolist()
     results = index.query(query_em, top_k=1 , include_metadata=True)
     print(results)
+
+    
     context = results['matches'][0]['metadata']['context']
     conn = http.client.HTTPSConnection("chatgpt-gpt-3-5.p.rapidapi.com")
      
